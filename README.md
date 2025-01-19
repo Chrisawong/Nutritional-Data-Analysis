@@ -26,7 +26,7 @@ This project demonstrates proficiency in data preprocessing, exploratory analysi
 - Create a cleaned dataset (`USDAclean`) for analysis.
 
 ### 2. Exploratory Data Analysis (EDA)
-- **Highest Sodium Food**: Identified "Table Salt" as the food with the highest sodium level (38,758 mg).
+- Identified the top 20 foods and ingredients with the highest sodium levels.
 - **Visualizations**:
   - Histogram for Vitamin C distribution.
   - Boxplot for Total Fat, Protein, and Carbohydrate distribution.
