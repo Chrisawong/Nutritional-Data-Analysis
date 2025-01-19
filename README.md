@@ -3,9 +3,9 @@
 ## Overview
 This project involves analyzing nutrient data from two USDA datasets, focusing on macronutrients and micronutrients. The analysis includes data cleaning, visualization, statistical analysis, and predictive modeling to gain insights into the relationships between nutrients and their effects on food healthiness.
 
-**Programming Language**: R
+Refer to `Source-code-with-outputs.html` for source code and outputs.
 
-**Libraries**: `ggplot2`, `GGally`, `corrplot`
+**Programming Language**: R (`ggplot2`, `GGally`, `corrplot`)
 
 **Techniques**: Data cleaning, correlation analysis, linear regression, data visualization
 
