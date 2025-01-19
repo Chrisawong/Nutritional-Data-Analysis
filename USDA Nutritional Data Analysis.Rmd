@@ -1,0 +1,330 @@
+---
+title: 'USDA Nutritional Data Analysis'
+output:
+  word_document: default
+  pdf_document: default
+---
+<h2> Created by Christopher Wong: 8-4-22 </h2> 
+<h3> Last updated: 1-19-25 </h3> 
+---
+
+#### Data Preprocessing
+Read and merged the datasets on a common key, handled missing values, 
+converted non-numeric data into numeric formats, created a cleaned dataset for analysis.
+```{r}
+# Read the data files into data frames
+macroNut <- read.csv("./USDA_Macronutrients.csv", header = TRUE)
+microNut <- read.csv("./USDA_Micronutrients.csv", header = TRUE)
+
+# Merge the data frames using the variable "ID"
+USDA <- merge(macroNut, microNut, by = "ID")
+
+# Checking the data types
+str(USDA)
+
+# Delete commas from the sodium recs, then make data types numeric instead
+USDA$Sodium <- gsub(",", "", USDA$Sodium)
+USDA$Sodium <- as.numeric(USDA$Sodium)
+
+# Delete commas from the potassium recs, then make data types numeric instead
+USDA$Potassium <- gsub(",", "", USDA$Potassium)
+USDA$Potassium <- as.numeric(USDA$Potassium)
+
+# Remove records (rows) with missing values in more than 6 attributes (columns)
+# get the rows with 4 or less missing values
+USDA <- USDA[rowSums(is.na(USDA)) <= 4, ]
+
+# Checking the data types to see # of records remaining in the data frame
+str(USDA)
+
+# Replace missing values for Sugar, Vitamin E and Vitamin D, with the mean value for the respective variable
+USDA$Sugar[is.na(USDA$Sugar)]       <- mean(USDA$Sugar[!is.na(USDA$Sugar)])
+USDA$VitaminE[is.na(USDA$VitaminE)] <- mean(USDA$VitaminE[!is.na(USDA$VitaminE)])
+USDA$VitaminD[is.na(USDA$VitaminD)] <- mean(USDA$VitaminD[!is.na(USDA$VitaminD)])
+
+#remove all remaining records with missing values, save to new data frame
+USDAclean <- USDA[complete.cases(USDA), ]
+
+# Checking the data types to see # of records remaining in the data frame
+str(USDAclean)
+```
+
+#### Sodium Content Analysis
+Consuming foods with such high sodium levels can lead to health issues such as hypertension, heart disease, and stroke. 
+It is important to monitor and limit the intake of these foods, especially for individuals with health conditions that require low sodium diets.
+Below is a list of the top 20 foods and ingredients with the highest sodium levels.
+```{r}
+# Sort the data frame by Sodium in descending order and select the top 20 rows
+top20_sodium <- USDAclean[order(-USDAclean$Sodium), ][1:20, ]
+
+# Display the top 20 foods/ingredients with the highest sodium levels
+top20_sodium
+
+```
+
+#### Vitamin C distribution in foods. 
+Vitamin C is an essential nutrient that plays a key role in maintaining overall health and immunity.
+Below are histograms showing the distribution of Vitamin C content in foods. 
+We see that the vast majority of foods have low to moderate levels of Vitamin C.
+For a more detailed view, we also created a histogram for foods with Vitamin C levels of 100 or more.
+
+```{r}
+# Histogram for Vitamin C distribution for all foods
+hist(USDAclean$VitaminC,
+     breaks = seq(0, max(USDAclean$VitaminC, na.rm = TRUE), by = 100),
+     xlab = "Vitamin C distribution in foods",
+     main = "Histogram of Vitamin C Distribution",
+     xlim = c(0, max(USDAclean$VitaminC, na.rm = TRUE)),
+     xaxt = "n")  # Suppress the default x-axis
+axis(1, at = seq(0, max(USDAclean$VitaminC, na.rm = TRUE), by = 100))
+
+# Filter the data to include only foods with Vitamin C levels of 100 or more
+high_vitaminC <- USDAclean[USDAclean$VitaminC >= 100, ]
+# Histogram for Vitamin C distribution for foods with Vitamin C levels of 100 or more
+hist(high_vitaminC$VitaminC,
+     breaks = seq(100, max(high_vitaminC$VitaminC, na.rm = TRUE), by = 100),
+     xlab = "Vitamin C distribution in foods (100 or more)",
+     main = "Histogram of Vitamin C Distribution (100 or more)",
+     xlim = c(100, max(high_vitaminC$VitaminC, na.rm = TRUE)),
+     xaxt = "n")  # Suppress the default x-axis
+
+# Customize the x-axis to reflect breaks of 100
+axis(1, at = seq(100, max(high_vitaminC$VitaminC, na.rm = TRUE), by = 100))
+```
+
+#### Distribution of values for TotalFat, Protein and Carbohydrate.
+The boxplot below visualizes the distribution of Total Fat, Protein, and Carbohydrates in the dataset. 
+This visualization aids in comparing the central tendencies and variability of these macronutrients, identifying outliers, 
+and gaining insights into the nutritional composition of the foods in the dataset.
+```{r}
+boxplot(USDAclean$TotalFat, USDAclean$Protein, USDAclean$Carbohydrate,
+        main  = "Distribution of: Total Fat, Protein, and Carbohydrates.",
+        names = c("Total Fat", "Protein", "Carbohydrates"))
+```
+
+#### Relationship between a food's TotalFat content and its Calorie content.
+The graph below indicates that there is a positive relationship between Total Fat content and Calorie content in foods. 
+This means that foods with higher fat content tend to have higher calorie content. 
+This relationship is expected because fat is a dense source of energy, providing 9 calories per gram, 
+compared to 4 calories per gram for protein and carbohydrates. 
+Therefore, as the fat content in foods increases, the overall calorie content also increases.
+
+Understanding this relationship is important for nutritional analysis and dietary planning, 
+as it helps in assessing the energy contribution of fat in different foods.
+```{r}
+plot(USDAclean$TotalFat, USDAclean$Calories,
+     main = "Relationship between Total Fat Content and Calorie Content.",
+     xlab = "Total fat Content",
+     ylab = "Calorie Content ")
+
+```
+
+#### Adding high nutrient indicators and counting foods with high sodium and fat
+The analysis reveals that there are 1,827 foods in the dataset that have both high sodium and high fat content. 
+This indicates a significant number of foods that may pose health risks due to their high levels of these two nutrients.
+
+By adding binary indicators, we provide a clear way to identify and categorize foods based on their nutrient levels. 
+This can be useful for further nutritional analysis and dietary planning.
+```{r}
+# Make new columns for: High Sodium, High Calories, High Protein, High Sugar, and High Fat
+# Check if value is greater than the avg. if true: set it equal to 1
+USDAclean$HSodium   <- 0
+USDAclean$HSodium[USDAclean$Sodium     > mean(USDAclean$Sodium)]   <- 1
+
+USDAclean$HCalories <- 0
+USDAclean$HCalories[USDAclean$Calories > mean(USDAclean$Calories)] <- 1
+
+USDAclean$HProtein  <- 0
+USDAclean$HProtein[USDAclean$Protein   > mean(USDAclean$Protein)]  <- 1
+
+USDAclean$HSugar    <- 0
+USDAclean$HSugar[USDAclean$Sodium      > mean(USDAclean$Sodium)]   <- 1
+
+USDAclean$HFat      <- 0
+USDAclean$HFat[USDAclean$Sodium        > mean(USDAclean$Sodium)]   <- 1
+
+# Number of foods have both high sodium and high fat
+sum(apply(USDAclean[c("HSodium", "HFat")], 1, function(x) all(x == 1)))
+# 1827 foods have both high sodium and high fat
+
+```
+
+#### Average amount of iron for high and low protein foods.
+Iron is an essential nutrient that plays a crucial role in oxygen transport and energy production. 
+Understanding the relationship between protein and iron content in foods can help in creating balanced diets that support overall health and well-being.
+
+Findings:
+- Low Protein Foods: The average amount of iron is approximately 2.70 mg.
+- High Protein Foods: The average amount of iron is approximately 3.07 mg.
+
+High protein foods tend to have a slightly higher average iron content compared to low protein foods. 
+This information is important for nutritional analysis and dietary planning, 
+helping to ensure adequate intake of both protein and iron.
+
+
+```{r}
+# average amount of iron, for high and low protein foods
+meanIron.lowProtein  <- mean(USDAclean$Iron[USDAclean$HProtein == 0])
+meanIron.lowProtein
+meanIron.highProtein <- mean(USDAclean$Iron[USDAclean$HProtein == 1])
+meanIron.highProtein
+```
+
+#### Custom HealthCheck program to detect unhealthy foods.
+This section implements a custom HealthCheck program to classify foods as either "Pass" or "Fail" 
+based on their sodium, sugar, and fat content. 
+The results show that 1,827 foods fail the HealthCheck, 
+highlighting the importance of monitoring and improving the nutritional quality of foods to support better health outcomes.
+```{r}
+# Used this algorithm chart as a basis for the function
+require(jpeg)
+file <- readJPEG("HealthCheck.jpg")
+plot(1:4, ty = "n", ann = FALSE, xaxt = "n", yaxt = "n")
+rasterImage(file, 1, 1, 4, 4)
+
+#logic according to flowchart basis
+HealthCheck <- function(sodium, sugar, fat) {
+
+  if      (sodium == 0) return("Pass")
+
+  else if (sugar == 0)  return("Pass")
+  else if (fat == 0)    return("Pass")
+
+  else                  return("Fail")
+}
+#input each type of food into the function
+USDAclean$HealthCheck <- apply(USDAclean[, c("HSodium", "HSugar", "HFat")], 1,
+                function(x) HealthCheck(x["HSodium"], x["HSugar"], x["HFat"]))
+
+#number of failed foods
+length(which(USDAclean$HealthCheck == "Fail"))
+
+
+```
+
+#### Correlation among Calories, Protein, Total Fat, Carbohydrate, Sodium and Cholesterol.
+The plot below provides a visual representation of the correlation between Calories, Protein, Total Fat, Carbohydrate, Sodium, and Cholesterol.
+
+- Positive Correlations: Strong positive correlations are indicated by darker colors and larger circles. For example, Calories show a strong positive correlations with Total Fat.
+- Negative Correlations: Negative correlations, are indicated by different colors and smaller circles.
+- Strength of Relationships: The size and color intensity of the circles indicate the strength of the correlations, with larger and darker circles representing stronger correlations.
+This visualization helps in understanding how these nutritional components are related to each other, which is useful for nutritional analysis and dietary planning.
+```{r}
+library(corrplot)
+
+#create matrix
+nutCorrplot = cor(USDAclean[, c("Calories", "Protein", "TotalFat",
+                  "Carbohydrate", "Sodium", "Cholesterol")])
+
+#plotting
+corrplot(nutCorrplot)
+
+```
+
+#### Statisical significance of the correlation between Calories and Total Fat.
+The correlation between Calories and Total Fat is statistically significant (p-value < 2.2e-16), 
+indicating a strong relationship between these two variables.
+```{r}
+# Find the pvalue using the function
+cor.test(USDAclean$Calories, USDAclean$TotalFat)
+# Set alpha = 0.05.
+# Now we compare it to the pvalue <  2.2 E-16
+# Since the pvalue is less than alpha, the correlation between Calories and Total Fat statistically significant.
+
+```
+
+#### Linear Regression Model for Calories based on Protein, Total Fat, Carbohydrate, Sodium, and Cholesterol.
+This model is used to predict Calories based on the independent variables: Protein, Total Fat, Carbohydrate, Sodium, and Cholesterol.
+This analysis helps in understanding the contribution of each macronutrient to the calorie content of foods.
+Sodium has a p-value of 0.055, so it does not significantly contribute to the prediction of Calories.
+```{r}
+nutLm <- lm (Calories ~ Protein + TotalFat + Carbohydrate + Sodium + Cholesterol,
+             data = USDAclean)
+summary(nutLm)
+# Sodium has a p-value of 0.05500, making it a non-significant variable.
+
+```
+
+#### New model using only significant independent variables.
+```{r}
+# Create a new model by using only the significant independent variables.
+sigVarLm <- (lm(Calories ~ Protein + TotalFat + Carbohydrate + Cholesterol,
+                data = USDAclean))
+summary(sigVarLm)
+
+```
+
+#### Using the new model to predict number of Calories for a new product.
+The new model predicts that a product with 0.1g Protein, 37g Total Fat, 400g Carbohydrate, and 75mg Cholesterol 
+will have approximately 1827.4 Calories.
+```{r}
+# New product data
+new_product <- data.frame(Protein = 0.1, TotalFat = 37, Carbohydrate = 400, Cholesterol = 75) 
+
+# Predict the value for Calories using the new model
+predicted_calories <- predict(sigVarLm, newdata = new_product)
+
+# Display the predicted value
+predicted_calories
+# 1827.405 is the predicted value for Calories
+```
+
+#### If the new product's Carbohydrate count increases by 10000%, how much change will occur on Calories?
+The Calories would increase by approximately 1083.33% when the Carbohydrate amount increases from 400 to 40000. 
+This large increase is due to the direct proportional relationship between Carbohydrate and Calories as 
+indicated by the linear regression model.
+```{r}
+# Extract the coefficient for Carbohydrate from the model
+carb_coef <- coef(sigVarLm)["Carbohydrate"]
+
+# Calculate the change in Carbohydrate
+carb_change <- 40000 - 400
+
+# Calculate the change in Calories
+calories_change <- carb_coef * carb_change
+
+# Calculate the initial predicted Calories for Carbohydrate = 400
+initial_calories <- predict(sigVarLm, newdata = data.frame(Protein = 0.1, TotalFat = 37, Carbohydrate = 400, Cholesterol = 75))
+
+# Calculate the new predicted Calories for Carbohydrate = 40000
+new_calories <- predict(sigVarLm, newdata = data.frame(Protein = 0.1, TotalFat = 37, Carbohydrate = 40000, Cholesterol = 75))
+
+# Calculate the percentage change in Calories
+percent_change <- ((new_calories - initial_calories) / initial_calories) * 100
+
+# Display the results
+initial_calories
+new_calories
+percent_change
+```
+#### How do Protein, Total Fat, and Carbohydrate content relate to the Calorie content in foods?
+The scatter plots and pair plot below will help us understand this relationship. 
+The linear regression lines in the scatter plots will indicate the direction and strength of the relationships. 
+The pair plot will provide a comprehensive view of the relationships between all four attributes.
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(GGally)
+
+# Scatter plot for Protein vs Calories
+ggplot(USDAclean, aes(x = Protein, y = Calories)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "blue") +
+  labs(title = "Protein vs Calories", x = "Protein", y = "Calories")
+
+# Scatter plot for Total Fat vs Calories
+ggplot(USDAclean, aes(x = TotalFat, y = Calories)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "blue") +
+  labs(title = "Total Fat vs Calories", x = "Total Fat", y = "Calories")
+
+# Scatter plot for Carbohydrate vs Calories
+ggplot(USDAclean, aes(x = Carbohydrate, y = Calories)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "blue") +
+  labs(title = "Carbohydrate vs Calories", x = "Carbohydrate", y = "Calories")
+
+# Pair plot to visualize relationships between Protein, Total Fat, Carbohydrate, and Calories
+ggpairs(USDAclean, columns = c("Protein", "TotalFat", "Carbohydrate", "Calories"),
+        title = "Pair Plot of Protein, Total Fat, Carbohydrate, and Calories")
+```
